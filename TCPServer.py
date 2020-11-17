@@ -3,13 +3,12 @@ import selectors
 
 
 class TCPServer:
-    def __init__(self, host='localhost', port=5000, max_clients=10, echo=False):
+    def __init__(self, host='localhost', port=5000, max_clients=10, bufsize=16):
         self.__selector = selectors.DefaultSelector()
 
         self.__reg_func = None
         self.__max_clients = max_clients
-
-        self.__echo = echo
+        self.__bufsize = bufsize
 
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -23,28 +22,38 @@ class TCPServer:
 
         current_num_clients = len(self.__selector.get_map()) - 1
         if current_num_clients < self.__max_clients:
-            self.__selector.register(fileobj=client, events=selectors.EVENT_READ, data=(self.__recieve, client, addr))
+            self.__selector.register(fileobj=client, events=selectors.EVENT_READ, data=(self.__receive, client, addr))
         else:
             client.close()
 
-    def __recieve(self, client, addr):
-        data = client.recv(1024)
+    def __receive(self, client, addr):
+        try:
+            data = client.recv(self.__bufsize)
 
-        if data:
-            return_data = self.__reg_func(addr, data)
+            if data:
+                return_data = self.__reg_func(addr, data)
 
-            if type(return_data) in [bytes, bytearray]:
-                client.send(return_data)
+
+                if type(return_data) in [bytes, bytearray]:
+                    try:
+                        client.send(return_data)
+                    except BrokenPipeError:
+                        self.__selector.unregister(client)
+                elif return_data is not None:
+                    self.__selector.unregister(client)
+                    raise TypeError('\'bytes\' or \'bytearray\' required')
             else:
                 self.__selector.unregister(client)
-                raise TypeError('\'bytes\' or \'bytearray\' required')
-        elif self.__echo:
-            client.send(data)
-        else:
+                client.close()
+
+        except ConnectionResetError:
             self.__selector.unregister(client)
             client.close()
 
     def run(self):
+        if self.__reg_func is  None:
+            raise RuntimeError('Handler not specified')
+
         while True:
             events = self.__selector.select()
 
@@ -52,9 +61,9 @@ class TCPServer:
                 callback = key.data[0]
                 callback(*key.data[1:])
 
-    def __call__(self, *args, **kwargs):
+    def handler(self, func):
         if self.__reg_func is None:
-            self.__reg_func = args[0]
+            self.__reg_func = func
         else:
             raise AttributeError(f'Method already associated')
 
