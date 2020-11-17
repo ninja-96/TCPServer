@@ -1,11 +1,14 @@
 from TCPServer import TCPServer
+import time
 
-server = TCPServer(echo=False)
+server = TCPServer()
 
-@server
+
+@server.handler
 def test(addr, data):
-    print(f'{addr} : {data}')
+    print(f'{addr[0]}:{addr[1]} - {data}')
 
+    time.sleep(0.3)
     return bytes(data)
 
 
