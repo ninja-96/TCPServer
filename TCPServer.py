@@ -3,6 +3,25 @@ import selectors
 
 
 class TCPServer:
+    """
+    ThreadTCPServer recv and send bytes or bytearray.
+    Server use socketserver.ThreadingTCPServer.
+
+    Examples::
+        To define handler just @decorate handler method
+            from TCPServer import TCPServer
+
+            server = TCPServer('localhost', 5000)
+
+            @server.handler
+            def my_method(addr: tuple, data: bytes) -> (bytes, bytearray):
+                print(f'{addr[0]}:{addr[1]} - {data}')
+                return bytes(data)
+
+            server.run()
+
+        In console type 'nc localhost 5000' to send data
+    """
     def __init__(self, host='localhost', port=5000, max_clients=10, bufsize=16):
         self.__selector = selectors.DefaultSelector()
 
@@ -33,7 +52,6 @@ class TCPServer:
             if data:
                 return_data = self.__reg_func(addr, data)
 
-
                 if type(return_data) in [bytes, bytearray]:
                     try:
                         client.send(return_data)
@@ -51,7 +69,7 @@ class TCPServer:
             client.close()
 
     def run(self):
-        if self.__reg_func is  None:
+        if self.__reg_func is None:
             raise RuntimeError('Handler not specified')
 
         while True:
