@@ -1,11 +1,11 @@
-from TCPServer import TCPServer
 import time
+from ThreadTCPServer import ThreadTCPServer
 
-server = TCPServer()
+server = ThreadTCPServer()
 
 
 @server.handler
-def test(addr, data):
+def test(addr: tuple, data: bytes) -> (bytes, bytearray):
     print(f'{addr[0]}:{addr[1]} - {data}')
 
     time.sleep(0.3)
