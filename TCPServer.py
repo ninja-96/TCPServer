@@ -25,7 +25,9 @@ class TCPServer:
     def __init__(self, host='localhost', port=5000, max_clients=10, bufsize=16):
         self.__selector = selectors.DefaultSelector()
 
-        self.__reg_func = None
+        self.__func = None
+        self.__args = None
+        self.__kwargs = None
         self.__max_clients = max_clients
         self.__bufsize = bufsize
 
@@ -50,7 +52,7 @@ class TCPServer:
             data = client.recv(self.__bufsize)
 
             if data:
-                return_data = self.__reg_func(addr, data)
+                return_data = self.__func(addr, data, *self.__args, **self.__kwargs)
 
                 if type(return_data) in [bytes, bytearray]:
                     try:
@@ -69,7 +71,7 @@ class TCPServer:
             client.close()
 
     def run(self):
-        if self.__reg_func is None:
+        if self.__func is None:
             raise RuntimeError('Handler not specified')
 
         while True:
@@ -79,10 +81,14 @@ class TCPServer:
                 callback = key.data[0]
                 callback(*key.data[1:])
 
-    def handler(self, func):
-        if self.__reg_func is None:
-            self.__reg_func = func
-        else:
-            raise AttributeError(f'Method already associated')
+    def handler(self, *args, **kwargs):
+        def decorator(func):
+            if self.__func is None:
+                self.__args = args
+                self.__kwargs = kwargs
+                self.__func = func
+            else:
+                raise AttributeError(f'Method already associated')
 
-        return self.__reg_func
+            return self.__func
+        return decorator
